@@ -129,7 +129,7 @@ def upload_image():
 # Route to render the main HTML page
 @app.route("/", methods=["GET"])
 def main_page():
-    return render_template("main.html")
+    return render_template("index.html")
 
 
 if __name__ == "__main__":
