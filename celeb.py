@@ -9,26 +9,63 @@ from datasets import load_dataset
 from tqdm import tqdm
 import base64
 from google.cloud import vision
+import gzip
+
 
 app = Flask(__name__)
 
-def preprocess_image(image_path):
-    # Load the image from the file path
-    image = cv2.imread(image_path)
-    if image is None:
-        raise ValueError(f"Failed to load image from path: {image_path}")
-    
+
+
+
+
+def unzip_file(compressed_path, decompressed_path):
+    """
+    Unzips a .gz file to the specified decompressed path.
+    """
+    if not os.path.exists(decompressed_path):
+        with gzip.open(compressed_path, 'rb') as compressed_file:
+            with open(decompressed_path, 'wb') as decompressed_file:
+                decompressed_file.write(compressed_file.read())
+        print(f"File decompressed to: {decompressed_path}")
+    else:
+        print(f"Decompressed file already exists: {decompressed_path}")
+
+
+
+def preprocess_image(image_bytes_or_path):
+    """
+    Preprocess an image. Handles both file paths and raw bytes.
+    """
+    if isinstance(image_bytes_or_path, bytes):
+        # If raw bytes are provided, decode the image
+        image_array = np.frombuffer(image_bytes_or_path, np.uint8)
+        image = cv2.imdecode(image_array, cv2.IMREAD_COLOR)
+        if image is None:
+            raise ValueError("Failed to decode image from bytes")
+    else:
+        # If it's a file path, read the image directly
+        image = cv2.imread(image_bytes_or_path)
+        if image is None:
+            raise ValueError(f"Failed to load image from path: {image_bytes_or_path}")
+
+    # Convert to RGB and resize
     image_rgb = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
     image_resized = tf.image.resize(image_rgb, IMAGE_SIZE) / 255.0
     return image_resized
 
 
-def extract_features_from_dataset(df, save_path="celebrity_features.npy"):
-    # Check if the file exists
+
+def extract_features_from_dataset(df, save_path="CELEBRITY-FINDER/celebrity_features.npy", compressed_path="CELEBRITY-FINDER/celebrity_features.npy.gz"):
+    # Decompress the file if it exists
+    if os.path.exists(compressed_path):
+        unzip_file(compressed_path, save_path)
+
+    # Check if the decompressed file exists
     if os.path.exists(save_path):
         print("Loading precomputed features from file...")
         return np.load(save_path)
 
+    # Proceed with feature extraction if no precomputed file is available
     print("Extracting features from dataset...")
     feature_vectors = []
     for _, row in tqdm(df.iterrows(), total=len(df), desc="Extracting features"):
@@ -43,6 +80,7 @@ def extract_features_from_dataset(df, save_path="celebrity_features.npy"):
     np.save(save_path, feature_vectors)
     print(f"Features saved to {save_path}")
     return feature_vectors
+
 
 
 # Load model and dataset
