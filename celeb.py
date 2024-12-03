@@ -9,28 +9,32 @@ from datasets import load_dataset
 from tqdm import tqdm
 import base64
 from google.cloud import vision
-import gzip
-
+import requests
 
 app = Flask(__name__)
 
+# Google Drive URL
+google_drive_url = "https://drive.google.com/uc?id=17TQ7teUPE__UQT3v10J_8aRfkmKCZzLh&export=download"
 
-
-
-
-def unzip_file(compressed_path, decompressed_path):
-    """
-    Unzips a .gz file to the specified decompressed path.
-    """
-    if not os.path.exists(decompressed_path):
-        with gzip.open(compressed_path, 'rb') as compressed_file:
-            with open(decompressed_path, 'wb') as decompressed_file:
-                decompressed_file.write(compressed_file.read())
-        print(f"File decompressed to: {decompressed_path}")
+# Download the file
+def download_file(url, save_path):
+    print(f"Downloading file from {url}...")
+    response = requests.get(url)
+    if response.status_code == 200:
+        with open(save_path, "wb") as file:
+            file.write(response.content)
+        print(f"File saved to {save_path}")
     else:
-        print(f"Decompressed file already exists: {decompressed_path}")
+        print(f"Failed to download file, status code: {response.status_code}")
 
+# Path to save the file
+save_path = "CELEBRITY-FINDER/celebrity_features.npy"
 
+# Download the file if it does not exist
+if not os.path.exists(save_path):
+    download_file(google_drive_url, save_path)
+else:
+    print(f"File already exists: {save_path}")
 
 def preprocess_image(image_bytes_or_path):
     """
@@ -53,14 +57,8 @@ def preprocess_image(image_bytes_or_path):
     image_resized = tf.image.resize(image_rgb, IMAGE_SIZE) / 255.0
     return image_resized
 
-
-
-def extract_features_from_dataset(df, save_path="CELEBRITY-FINDER/celebrity_features.npy", compressed_path="CELEBRITY-FINDER/celebrity_features.npy.gz"):
-    # Decompress the file if it exists
-    if os.path.exists(compressed_path):
-        unzip_file(compressed_path, save_path)
-
-    # Check if the decompressed file exists
+def extract_features_from_dataset(df, save_path="CELEBRITY-FINDER/celebrity_features.npy"):
+    # Check if the feature file exists, otherwise extract features
     if os.path.exists(save_path):
         print("Loading precomputed features from file...")
         return np.load(save_path)
@@ -81,8 +79,6 @@ def extract_features_from_dataset(df, save_path="CELEBRITY-FINDER/celebrity_feat
     print(f"Features saved to {save_path}")
     return feature_vectors
 
-
-
 # Load model and dataset
 MODEL_HANDLE = "https://tfhub.dev/google/imagenet/efficientnet_v2_imagenet21k_ft1k_b0/feature_vector/2"
 IMAGE_SIZE = (224, 224)
@@ -91,14 +87,12 @@ dataset = load_dataset("tonyassi/celebrity-1000", split="train")
 df = dataset.to_pandas()
 celebrity_features = extract_features_from_dataset(df, save_path="celebrity_features.npy")
 
-
 # Google Vision API setup
 google_key_path = "CELEBRITY-FINDER/google_key/strategic-arc-443523-b0-360a5e15ca65.json"
 vision_client = None
 if os.path.exists(google_key_path):
     os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = google_key_path
     vision_client = vision.ImageAnnotatorClient()
-
 
 @app.route("/doppelganger", methods=["POST"])
 def doppelganger():
@@ -122,7 +116,6 @@ def doppelganger():
     similarity = cosine_similarity(user_features, doppelganger_features).flatten()[0] * 100
 
     return jsonify({"similarity_score": round(similarity, 2)})
-
 
 @app.route("/basic", methods=["POST"])
 def upload_image():
@@ -163,12 +156,10 @@ def upload_image():
 
     return jsonify({"matches": matches})
 
-
 # Route to render the main HTML page
 @app.route("/", methods=["GET"])
 def main_page():
     return send_file("index.html")
-
 
 if __name__ == "__main__":
     app.run(debug=True)
