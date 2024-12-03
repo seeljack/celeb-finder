@@ -6,13 +6,11 @@ import tensorflow_hub as hub
 import cv2
 from sklearn.metrics.pairwise import cosine_similarity
 from datasets import load_dataset
-from google.cloud import vision
 from tqdm import tqdm
 import base64
-
+from google.cloud import vision
 
 app = Flask(__name__)
-
 
 def preprocess_image(image_path):
     # Load the image from the file path
@@ -23,7 +21,6 @@ def preprocess_image(image_path):
     image_rgb = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
     image_resized = tf.image.resize(image_rgb, IMAGE_SIZE) / 255.0
     return image_resized
-
 
 
 def extract_features_from_dataset(df, save_path="celebrity_features.npy"):
@@ -57,10 +54,12 @@ df = dataset.to_pandas()
 celebrity_features = extract_features_from_dataset(df, save_path="celebrity_features.npy")
 
 
-
 # Google Vision API setup
-os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = "CELEBRITY-FINDER/google_key/strategic-arc-443523-b0-360a5e15ca65.json"
-client = vision.ImageAnnotatorClient()
+google_key_path = "CELEBRITY-FINDER/google_key/strategic-arc-443523-b0-360a5e15ca65.json"
+vision_client = None
+if os.path.exists(google_key_path):
+    os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = google_key_path
+    vision_client = vision.ImageAnnotatorClient()
 
 
 @app.route("/doppelganger", methods=["POST"])
@@ -86,6 +85,7 @@ def doppelganger():
 
     return jsonify({"similarity_score": round(similarity, 2)})
 
+
 @app.route("/basic", methods=["POST"])
 def upload_image():
     if "image" not in request.files:
@@ -107,14 +107,15 @@ def upload_image():
     for idx in top_indices:
         row = df.iloc[idx]
         image_bytes = row["image"]["bytes"]  # Access raw image bytes
-        vision_image = vision.Image(content=image_bytes)
-        response = client.web_detection(image=vision_image)
 
-        # Use Google Vision API to find a relevant URL or name
-        if response.web_detection.web_entities:
-            description = response.web_detection.web_entities[0].description
-        else:
-            description = "Unknown"
+        # Use Google Vision API if credentials are available
+        description = "Unknown"
+        if vision_client:
+            vision_image = vision.Image(content=image_bytes)
+            response = vision_client.web_detection(image=vision_image)
+            if response.web_detection.web_entities:
+                description = response.web_detection.web_entities[0].description
+
         matches.append({
             "name": str(row["label"]),  # Convert to Python string
             "similarity": float(round(similarities[idx] * 100, 2)),  # Convert to Python float
@@ -125,13 +126,11 @@ def upload_image():
     return jsonify({"matches": matches})
 
 
-
-
 # Route to render the main HTML page
 @app.route("/", methods=["GET"])
 def main_page():
     return render_template("main.html")
 
+
 if __name__ == "__main__":
     app.run(debug=True)
-
