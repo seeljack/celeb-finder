@@ -1,0 +1,292 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>StarMirror</title>
+    <link rel="stylesheet" href="../css/style.css">
+    <style>
+        /* General body styling */
+        body {
+            font-family: 'Arial', sans-serif;
+            text-align: center;
+            margin: 0;
+            padding: 0;
+            background-color: #f8f9fa;
+            color: #333;
+        }
+
+        /* Header navigation styling */
+        header nav {
+            background-color: #2b6777;
+            padding: 10px 0;
+        }
+
+        header nav ul {
+            list-style-type: none;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            justify-content: center;
+            gap: 20px;
+        }
+
+        header nav ul li a {
+            text-decoration: none;
+            color: #fff;
+            font-weight: bold;
+            padding: 5px 10px;
+            transition: background-color 0.3s ease;
+        }
+
+        header nav ul li a:hover {
+            background-color: #52ab98;
+            border-radius: 5px;
+        }
+
+        /* Main heading styling */
+        h1 {
+            color: #2b6777;
+            margin-top: 20px;
+        }
+
+        h2 {
+            color: #52ab98;
+        }
+
+        /* Upload form styling */
+        .upload-form {
+            margin: 20px auto;
+            padding: 20px;
+            background-color: #fff;
+            border: 1px solid #ddd;
+            border-radius: 10px;
+            max-width: 500px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+        }
+
+        .upload-form input[type="file"] {
+            display: block;
+            margin: 10px auto;
+            margin-left: 150px;
+        }
+
+        .upload-form button {
+            background-color: #2b6777;
+            color: #fff;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: background-color 0.3s ease;
+        }
+
+        .upload-form button:hover {
+            background-color: #52ab98;
+        }
+
+        /* Results section styling */
+        .results {
+            display: none;
+            margin-top: 20px;
+        }
+
+        .uploaded-image img, 
+        .lookalike-images img {
+            max-width: 150px;
+            border: 2px solid #ddd;
+            border-radius: 10px;
+            margin-bottom: 10px;
+        }
+
+        .lookalike-images {
+            display: flex;
+            gap: 20px;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+
+        .lookalike-images p {
+            font-size: 0.9em;
+            color: #555;
+        }
+
+        /* Footer for additional text */
+        footer {
+            margin-top: 30px;
+            padding: 10px 0;
+            background-color: #2b6777;
+            color: #fff;
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <nav>
+            <ul>
+                <li><a href="../index.html">Home</a></li>
+                <li><a href="../projects.html">Projects</a></li>
+            </ul>
+        </nav>
+    </header>
+
+    <main>
+        <h1>StarMirror</h1>
+        <h2>Find the star that shines like you!</h2>
+        <p>Want to find your celebrity lookalike? Upload a picture below to discover your top 5 matches!</p>
+
+        <!-- Image Upload Form -->
+        <div class="upload-form">
+            <form id="uploadForm" action="/basic" method="POST">
+                <input type="file" id="imageInput" accept="image/*" required>
+                <button type="submit">Find My Celebrity Lookalike</button>
+            </form>
+        </div>
+
+        <!-- Display Results -->
+        <div id="results" class="results">
+            <h2>Your Lookalike Matches:</h2>
+            <div class="uploaded-image" id="uploadedImage"></div>
+            <div class="lookalike-images" id="resultImages"></div>
+        </div>
+
+        <p>Want to see how close you really look to your doppelganger? Upload a photo of you and your doppelganger below!</p>
+        <div class="upload-form">
+            <form id="doppelgangerForm" action="/doppelganger" method="POST">
+                <input type="file" id="userImage" accept="image/*" required>
+                <input type="file" id="doppelgangerImage" accept="image/*" required>
+                <button type="submit">Inspect My Doppelganger!</button>
+            </form>
+        </div>
+
+        <!-- Doppelganger Results -->
+        <div id="doppelgangerResults" class="results">
+            <h2>Doppelganger Similarity Score:</h2>
+            <div class="uploaded-image" id="userImagePreview"></div>
+            <div class="uploaded-image" id="doppelgangerImagePreview"></div>
+            <p id="similarityScore"></p>
+        </div>
+    </main>
+
+  <script>
+    // Frontend JavaScript to handle form submission
+    const form = document.getElementById("uploadForm");
+    form.addEventListener("submit", async (e) => {
+        e.preventDefault();
+        const imageInput = document.getElementById("imageInput").files[0];
+        if (!imageInput) return;
+
+        // Create FormData for file upload
+        const formData = new FormData();
+        formData.append("image", imageInput);
+        console.log("HERERERERE")
+        for (const pair of formData.entries()) {
+            console.log(pair[0], pair[1]);
+        }
+        // Send image to backend
+        const response = await fetch("/basic", {
+            method: "POST",
+            body: formData,
+        });
+        console.log("AFTERERERER")
+        console.log(response)
+        if (response.ok) {
+            const data = await response.json();
+            displayResults(data);
+        } else {
+            alert("Error: Unable to process your request. Try again later!");
+        }
+    });
+
+    function displayResults(data) {
+    const resultsDiv = document.getElementById("results");
+    const uploadedImageDiv = document.getElementById("uploadedImage");
+    const resultImagesDiv = document.getElementById("resultImages");
+
+    uploadedImageDiv.innerHTML = "";
+    resultImagesDiv.innerHTML = "";
+
+    // Display uploaded image
+    const uploadedImg = document.createElement("img");
+    uploadedImg.src = URL.createObjectURL(document.getElementById("imageInput").files[0]);
+    uploadedImg.alt = "Uploaded Image";
+    uploadedImageDiv.appendChild(uploadedImg);
+
+    // Display lookalike images
+    data.matches.forEach(match => {
+        const container = document.createElement("div");
+        container.style.textAlign = "center";
+
+        const img = document.createElement("img");
+        img.src = match.image; // Celebrity image
+        img.alt = match.name;
+
+        const caption = document.createElement("p");
+        caption.textContent = `${match.description} (${match.similarity}%)`;
+
+        container.appendChild(img);
+        container.appendChild(caption);
+        resultImagesDiv.appendChild(container);
+    });
+
+    resultsDiv.style.display = "block";
+}
+
+const doppelgangerForm = document.getElementById("doppelgangerForm");
+doppelgangerForm.addEventListener("submit", async (e) => {
+    e.preventDefault();
+
+    const userImage = document.getElementById("userImage").files[0];
+    const doppelgangerImage = document.getElementById("doppelgangerImage").files[0];
+    if (!userImage || !doppelgangerImage) return;
+
+    // Prepare FormData
+    const formData = new FormData();
+    formData.append("user_image", userImage);
+    formData.append("doppelganger_image", doppelgangerImage);
+
+    // Send images to backend
+    const response = await fetch("/doppelganger", {
+        method: "POST",
+        body: formData,
+    });
+
+    if (response.ok) {
+        const data = await response.json();
+        displayDoppelgangerResults(data, userImage, doppelgangerImage);
+    } else {
+        alert("Error: Unable to process your request. Try again later!");
+    }
+});
+
+function displayDoppelgangerResults(data, userImage, doppelgangerImage) {
+    const doppelgangerResultsDiv = document.getElementById("doppelgangerResults");
+    const userImagePreview = document.getElementById("userImagePreview");
+    const doppelgangerImagePreview = document.getElementById("doppelgangerImagePreview");
+    const similarityScore = document.getElementById("similarityScore");
+
+    // Display user image
+    userImagePreview.innerHTML = "";
+    const userImg = document.createElement("img");
+    userImg.src = URL.createObjectURL(userImage);
+    userImg.alt = "Your Image";
+    userImagePreview.appendChild(userImg);
+
+    // Display doppelganger image
+    doppelgangerImagePreview.innerHTML = "";
+    const doppelgangerImg = document.createElement("img");
+    doppelgangerImg.src = URL.createObjectURL(doppelgangerImage);
+    doppelgangerImg.alt = "Doppelganger Image";
+    doppelgangerImagePreview.appendChild(doppelgangerImg);
+
+    // Display similarity score
+    similarityScore.textContent = `Similarity Score: ${data.similarity_score}%`;
+
+    doppelgangerResultsDiv.style.display = "block";
+}
+
+
+  </script>
+</body>
+</html>
